@@ -59,15 +59,63 @@ Requires Python ≥ 3.11 (`tomllib`), `pydantic`, `httpx`. Everything else is op
 ## Layout
 
 ```
-config/            models.toml + per-mode system prompts
-src/clid/
-  graph/           LangGraph-compatible StateGraph engine + PipelineState
-  llm/             LLMClient (mock / openai) + SequentialSwapManager
-  orchestrator/    the 5 modes
-  coder/           generation node
-  tools/           workspace · runners · manifest · sandbox
-  cli.py           entrypoint
-tests/
+├── .env.example
+├── .gitignore
+├── README.md
+├── VERIFICATION.md
+├── pyproject.toml
+├── config/
+│   ├── models.toml
+│   └── prompts/
+│       ├── classify.md
+│       ├── coder.md
+│       ├── delegate.md
+│       ├── design.md
+│       ├── diagnose.md
+│       └── judge.md
+├── docs/
+│   ├── architectural_blueprint.md
+│   └── 로컬 코딩 에이전트 오케스트레이션 블루프린트.pdf
+├── src/
+│   └── clid/
+│       ├── __init__.py
+│       ├── __main__.py
+│       ├── cli.py
+│       ├── config.py
+│       ├── resource.py
+│       ├── schemas.py
+│       ├── coder/
+│       │   ├── __init__.py
+│       │   └── coder.py
+│       ├── graph/
+│       │   ├── __init__.py
+│       │   ├── checkpoint.py
+│       │   ├── engine.py
+│       │   ├── pipeline.py
+│       │   └── state.py
+│       ├── llm/
+│       │   ├── __init__.py
+│       │   ├── client.py
+│       │   ├── mockgen.py
+│       │   └── model_manager.py
+│       ├── orchestrator/
+│       │   ├── __init__.py
+│       │   └── orchestrator.py
+│       └── tools/
+│           ├── __init__.py
+│           ├── manifest.py
+│           ├── runners.py
+│           ├── sandbox.py
+│           ├── templater.py
+│           └── workspace.py
+└── tests/
+    ├── __init__.py
+    ├── test_engine.py
+    ├── test_escalation.py
+    ├── test_openai_backend.py
+    ├── test_pipeline.py
+    ├── test_resource.py
+    └── test_tools.py
 ```
 
 The `graph` engine mirrors LangGraph's API (`add_node`, `add_conditional_edges`,
