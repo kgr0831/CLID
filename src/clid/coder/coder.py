@@ -24,6 +24,7 @@ class Coder:
         *,
         attempt: int = 0,
         demo_bug: bool = False,
+        persist_fail: bool = False,
         correction: str = "",
     ) -> tuple[CoderOutput, SwapEvent | None]:
         client, swap = self.manager.coder()
@@ -46,6 +47,7 @@ class Coder:
             "path": task.path,
             "attempt": attempt,
             "demo_bug": demo_bug,
+            "persist_fail": persist_fail,
             "correction": correction,
         }
         raw = client.chat(mode="coder", system=system, user=user, context=context)

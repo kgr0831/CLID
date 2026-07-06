@@ -104,9 +104,14 @@ class MockLLM(LLMClient):
         path = ctx.get("path", "")
         attempt = int(ctx.get("attempt", 0))
         demo_bug = bool(ctx.get("demo_bug", False))
+        persist = bool(ctx.get("persist_fail", False))
+        buggy = plan.get("files_buggy", {})
         good = plan["files_good"].get(path, f"# {path}\n")
-        if demo_bug and attempt == 0 and path in plan.get("files_buggy", {}):
-            return {"path": path, "content": plan["files_buggy"][path],
+        if persist and path in buggy:  # never converges — drives L2/L3/L4 escalation
+            return {"path": path, "content": buggy[path],
+                    "notes": "persistent-failure mode (always buggy)"}
+        if demo_bug and attempt == 0 and path in buggy:
+            return {"path": path, "content": buggy[path],
                     "notes": "initial attempt (demo bug: missing zero-guard)"}
         note = "applied correction (added zero-guard)" if attempt > 0 else "generated"
         return {"path": path, "content": good, "notes": note}

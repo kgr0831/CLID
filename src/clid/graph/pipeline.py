@@ -97,6 +97,7 @@ class Pipeline:
         design = Design(**s["design"])
         files = dict(s.get("files") or {})
         demo_bug = bool(s.get("demo_bug", False))
+        persist_fail = bool(s.get("persist_fail", False))
         focus = s.get("focus_path", "")
         logs: list[str] = []
 
@@ -107,8 +108,8 @@ class Pipeline:
             else:
                 attempt = s["retries"]["rewrite"]
                 out, swap = self.coder.generate(
-                    s["request"], task, attempt=attempt,
-                    demo_bug=demo_bug, correction=s.get("_correction", ""),
+                    s["request"], task, attempt=attempt, demo_bug=demo_bug,
+                    persist_fail=persist_fail, correction=s.get("_correction", ""),
                 )
                 self.ws.write(out.path, out.content)
                 files[out.path] = out.content
@@ -121,7 +122,8 @@ class Pipeline:
         tpl_tasks = [t for t in dele.tasks if t.route == "template"]
         swap_logged = False
         for t in coder_tasks:
-            out, swap = self.coder.generate(s["request"], t, attempt=0, demo_bug=demo_bug)
+            out, swap = self.coder.generate(s["request"], t, attempt=0,
+                                            demo_bug=demo_bug, persist_fail=persist_fail)
             if swap and not swap_logged:
                 logs += self._swap_logs(swap); swap_logged = True
             self.ws.write(out.path, out.content)
@@ -254,8 +256,10 @@ class Pipeline:
         g.add_edge("halt", END)
         return g.compile(checkpointer=JSONCheckpointer(self.settings.runs_dir), max_steps=200)
 
-    def run(self, request: str, *, demo_bug: bool = False, on_step=None) -> dict:
+    def run(self, request: str, *, demo_bug: bool = False,
+            persist_fail: bool = False, on_step=None) -> dict:
         state = new_state(request, str(self.ws.root), self.run_id)
         state["demo_bug"] = demo_bug
+        state["persist_fail"] = persist_fail
         compiled = self.build_graph()
         return compiled.invoke(state, {"thread_id": self.run_id, "on_step": on_step})

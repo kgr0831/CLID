@@ -112,6 +112,72 @@ def cmd_show_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_verify(args: argparse.Namespace) -> int:
+    """Hardware-free verification: resource model + functional self-checks."""
+    import os
+    import tempfile
+    from pathlib import Path
+
+    from clid.resource import format_report, validate
+
+    report = validate()
+    print(format_report(report))
+
+    # Functional self-checks always run on the mock backend (offline).
+    os.environ["CLID_BACKEND"] = "mock"
+    get_settings.cache_clear()  # type: ignore[attr-defined]
+    settings = get_settings()
+    from clid.graph.pipeline import Pipeline
+
+    print("\n\nFUNCTIONAL SELF-CHECKS · mock backend, offline")
+    print("=" * 70)
+    fchecks: list[tuple[str, bool, str]] = []
+    with tempfile.TemporaryDirectory() as tmp:
+        settings.workspaces_dir = Path(tmp) / "ws"
+        settings.runs_dir = Path(tmp) / "runs"
+
+        f1 = Pipeline(settings, "verify-clean").run("Build a Python calculator library with tests")
+        fchecks.append((
+            "clean run: 6 stages, PASS on first review, tests execute",
+            f1["status"] == "done" and f1["result"]["tests_passed"] and f1["iterations"] == 0,
+            f"status={f1['status']} tests={f1['result'].get('tests_passed')} iters={f1['iterations']} swaps={f1['result'].get('swaps')}",
+        ))
+        f2 = Pipeline(settings, "verify-bug").run("calculator library", demo_bug=True)
+        fchecks.append((
+            "L1 self-repair: injected bug fixed via exactly one rewrite loop",
+            f2["status"] == "done" and f2["iterations"] == 1 and f2["result"]["tests_passed"],
+            f"status={f2['status']} iters={f2['iterations']}",
+        ))
+        f3 = Pipeline(settings, "verify-generic").run("make a widget parser thing")
+        fchecks.append((
+            "generic fallback recipe completes green",
+            f3["status"] == "done" and f3["result"]["tests_passed"],
+            f"status={f3['status']}",
+        ))
+
+    for name, ok, detail in fchecks:
+        print(f"  [{'PASS' if ok else 'FAIL'}] {name}\n         {detail}")
+
+    all_ok = report.all_ok and all(ok for _, ok, _ in fchecks)
+    total = len(report.checks) + len(fchecks)
+    passed = sum(c.ok for c in report.checks) + sum(ok for _, ok, _ in fchecks)
+
+    print("\n\nREQUIRES PHYSICAL RTX 4090 (cannot be verified without hardware):")
+    print("=" * 70)
+    for item in (
+        "actual decode throughput (tok/s) per model and quant",
+        "true concurrent slot count under GPU-compute (not just memory) bottleneck",
+        "real quantized-model output quality / SWE-bench pass rate",
+        "measured warm-cache swap latency on your NVMe + PCIe",
+        "KV-quantization quality trade-off at extended (>24K) context",
+    ):
+        print(f"  • {item}")
+
+    print(f"\n{'='*70}")
+    print(f"{'✓ VERIFICATION PASSED' if all_ok else '✗ VERIFICATION FAILED'} — {passed}/{total} checks")
+    return 0 if all_ok else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="clid", description="Local coding-agent orchestration.")
     p.add_argument("request", nargs="?", help="natural-language build request")
@@ -119,6 +185,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--demo-bug", action="store_true",
                    help="inject a bug on the first Coder attempt to exercise the L1 rewrite loop")
     p.add_argument("--quiet", action="store_true", help="suppress live stage logging")
+    p.add_argument("--verify", action="store_true",
+                   help="hardware-free verification: resource model + functional self-checks")
     p.add_argument("--list-runs", action="store_true", help="list previous runs")
     p.add_argument("--show-run", metavar="RUN_ID", help="show a previous run's log + result")
     return p
@@ -126,6 +194,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.verify:
+        return cmd_verify(args)
     if args.list_runs:
         return cmd_list_runs(args)
     if args.show_run:
