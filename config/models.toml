@@ -1,0 +1,55 @@
+# CLID model / resource configuration — RTX 4090 24GB, sequential-swap.
+# Values mirror the 2026-07 architecture blueprint. Read via stdlib tomllib.
+
+[hardware]
+gpu = "RTX 4090"
+vram_gb = 24
+ram_gb = 64
+os = "Windows 11"
+
+[strategy]
+# "sequential_swap" → one model owns 24GB at a time (Phase A vs Phase B).
+# "concurrent"      → Coder resident + Orchestrator partially offloaded (throughput mode).
+mode = "sequential_swap"
+fixed_overhead_gb = 1.5      # driver + runtime, excluded from the slot budget
+
+# ─── Orchestrator: judgement, 5 modes (classify/design/delegate/diagnose/judge)
+[orchestrator]
+model = "Qwen3.6-35B-A3B"
+params = "35B (active 3B) MoE"
+quant = "Q4"
+weights_gb = 18
+kv_runtime_gb = 3
+native_context = 262144      # 262K; only 'design' mode expands this far
+default_context = 8192       # classify/delegate stay short to save KV
+functions = true
+thinking = true
+
+# ─── Coder: generation only. Two workflow scenarios. ───────────────────────
+[coder]
+scenario = "A"               # "A" single high-quality worker | "B" high-parallel + merge
+
+[coder.scenario_A]
+model = "Qwen3-Coder-30B-A3B"
+params = "30B (active 3.3B) MoE"
+quant = "Q4_K_M"
+weights_gb = 19
+attention = "GQA (kv_heads=4)"
+slot_context = 8192
+max_slots = 4                # shared pool, tune upward until VRAM fills
+
+[coder.scenario_B]
+model = "DeepSeek-Coder-V2-Lite-16B"
+params = "16B (active 2.4B) MoE"
+quant = "Q4"
+weights_gb = 9
+attention = "MLA (512+64)"
+slot_context = 8192
+max_slots = 16               # example; GPU compute bottlenecks before memory
+
+# ─── Review loop escalation thresholds (see graph/pipeline.py) ─────────────
+[review]
+rewrite_retries = 2          # L1: same-Coder rewrites before escalating
+redelegate_retries = 2       # L2: Runner re-delegations before escalating
+redesign_retries = 1         # L3: Sub-planner redesigns before HALT
+global_budget_iters = 12     # L4: hard ceiling across the whole run

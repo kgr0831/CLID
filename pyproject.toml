@@ -1,0 +1,31 @@
+[project]
+name = "clid"
+version = "0.1.0"
+description = "Local coding-agent orchestration for a single RTX 4090 (24GB) — Orchestrator (5 modes) + Coder, sequential-swap, no-offload."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "CLID" }]
+dependencies = [
+    "pydantic>=2.0",
+    "httpx>=0.24",
+]
+
+[project.optional-dependencies]
+# Real backends / niceties. The core runs without any of these (mock backend).
+serve = ["openai>=1.0"]
+manifest = ["tree-sitter>=0.21", "tree-sitter-languages>=1.10"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+clid = "clid.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
